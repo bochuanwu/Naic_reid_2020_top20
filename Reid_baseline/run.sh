@@ -6,7 +6,7 @@ echo Train
 #https://github.com/XingangPan/IBN-Net/releases/download/v1.0/resnext101_ibn_a-6ace051d.pth
 #nohup python train.py --config_file configs/naic_efn.yml > logs.txt 2>&1 & 
 #nohup python train.py --config_file configs/naic_round2_model_a.yml > logs2.txt 2>&1 & 
-nohup python train.py --config_file configs/naic_resnext_a.yml > logs.txt 2>&1 & 
+#nohup python train.py --config_file configs/naic_resnext_a.yml > logs.txt 2>&1 & 
 
 #nohup python train.py --config_file configs/naic_round2_model_b.yml > logs2.txt 2>&1 & 
 
@@ -21,7 +21,7 @@ nohup python train.py --config_file configs/naic_resnext_a.yml > logs.txt 2>&1 &
 #python test.py --config_file configs/naic_efn.yml 
 #python test.py --config_file configs/naic_resnext_a.yml 
 
-#python test.py --config_file configs/naic_round2_model_a.yml
+python test.py --config_file configs/naic_round2_model_a.yml
 
 #python test.py --config_file configs/naic_round2_model_b.yml
 
