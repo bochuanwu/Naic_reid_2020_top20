@@ -54,7 +54,11 @@ _C.MODEL.ID_LOSS_WEIGHT = 1.0
 _C.MODEL.TRIPLET_LOSS_WEIGHT = 1.0
 _C.MODEL.WEIGHTED_TRIPLET = False
 _C.MODEL.THRESH = 0.0
-_C.MODEL.USE_SESTN = False
+_C.MODEL.IMAGE_SIZE = [128, 256]  # width * height, ex: 192 * 256
+_C.MODEL.HEATMAP_SIZE = [16, 32]  # width * height, ex: 24 * 32
+_C.MODEL.SIGMA = 2
+_C.MODEL.EXTRA = CN(new_allowed=True)
+
 # -----------------------------------------------------------------------------
 # INPUT
 # -----------------------------------------------------------------------------
@@ -69,8 +73,10 @@ _C.INPUT.PROB = 0.5
 _C.INPUT.RE_PROB = 0.5
 # Values to be used for image normalization
 _C.INPUT.PIXEL_MEAN = [0.485, 0.456, 0.406]
+
 # Values to be used for image normalization
 _C.INPUT.PIXEL_STD = [0.229, 0.224, 0.225]
+#_C.INPUT.PIXEL_STD = [[0.1467,0.1497,0.1930],[0.0750,0.0613,0.1040]]
 
 # Value of padding size
 _C.INPUT.PADDING = 10

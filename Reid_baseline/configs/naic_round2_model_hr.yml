@@ -1,20 +1,20 @@
 MODEL:
   PRETRAIN_CHOICE: 'imagenet'
-  PRETRAIN_PATH: './resnext101_ibn_a-6ace051d.pth'
+  PRETRAIN_PATH: './ctw1500_res50_pretrain_ic17.pth'
   METRIC_LOSS_TYPE: 'triplet_center'
   IF_LABELSMOOTH: 'on'
   IF_WITH_CENTER: 'yes'
-  NAME: 'resnext101_ibn_a'
-  DEVICE_ID: ('0,1')
+  NAME: 'HRnet'
+  DEVICE_ID: ('1')
   ID_LOSS_TYPE: 'arcface'
   ID_LOSS_WEIGHT: 0.1
   TRIPLET_LOSS_WEIGHT: 0.9
   WEIGHTED_TRIPLET: True
   NO_MARGIN: True
-  
+
 INPUT:
-  SIZE_TRAIN: [256, 128]
-  SIZE_TEST: [256, 128]
+  SIZE_TRAIN: [256, 192]
+  SIZE_TEST: [256, 192]
   PROB: 0.5 # random horizontal flip
   RE_PROB: 0.5 # random erasing
   PADDING: 10
@@ -30,31 +30,30 @@ DATALOADER:
   NUM_WORKERS: 8
 
 SOLVER:
-  OPTIMIZER_NAME: 'Ranger'
+  OPTIMIZER_NAME: 'Adam'
   MAX_EPOCHS: 120
-  BASE_LR: 0.006
-  IMS_PER_BATCH: 160
-  STEPS: [40,70] #25,40
+  BASE_LR: 1e-3
+  IMS_PER_BATCH: 64
+  STEPS: [25, 40] #25,40
   GAMMA: 0.1
   WARMUP_FACTOR: 0.01
   WARMUP_EPOCHS: 10
   WARMUP_METHOD: 'linear'
-  LARGE_FC_LR: True
-  CHECKPOINT_PERIOD: 1
+  LARGE_FC_LR: False
+  CHECKPOINT_PERIOD: 10
   LOG_PERIOD: 50
-  EVAL_PERIOD: 2000
+  EVAL_PERIOD: 10000
   COSINE_MARGIN: 0.4
   COSINE_SCALE: 30
   CENTER_LOSS_WEIGHT: 0.0003
   FP16: False
+
 TEST:
   IMS_PER_BATCH: 128
-  RE_RANKING: True
-  WEIGHT:  '../model/resnext-a-noCJ-pk4bs224-LFL-readimg/resnext101_ibn_a_69.pth'
+  RE_RANKING: False
+  WEIGHT: '../model/1229-a-hr/hrnet_50.pth'
   NECK_FEAT: 'after'
   FEAT_NORM: 'yes'
   FLIP_FEATS: 'on'
-OUTPUT_DIR: "../model/resnext-a-noCJ-pk4bs224-LFL-readimg/"
-
-
+OUTPUT_DIR: "../model/1229-a-hr/"
 

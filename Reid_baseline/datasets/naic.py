@@ -7,29 +7,29 @@ class NAIC(BaseImageDataset):
     def __init__(self, root='../data', verbose = True):
         super(NAIC, self).__init__()
         self.dataset_dir = root
-        self.dataset_dir_train_old = osp.join(self.dataset_dir, '2019_second')
         self.dataset_dir_train = osp.join(self.dataset_dir, 'train')
         self.dataset_dir_test = osp.join(self.dataset_dir, 'test')
-        train2 = self._process_dir_old_data(self.dataset_dir_train_old, relabel=True)
+        self.dataset_dir_val = osp.join(self.dataset_dir, '2019_first')
+        val_gallery,val_query = self._process_dir_val(self.dataset_dir_val, relabel=True)
         train = self._process_dir(self.dataset_dir_train, relabel=True)
         query_green, query_normal = self._process_dir_test(self.dataset_dir_test,  query = True)
         gallery_green, gallery_normal = self._process_dir_test(self.dataset_dir_test, query = False)
-        
         if verbose:
             print("=> NAIC Competition data loaded")
-            self.print_dataset_statistics(train+train2, query_green+query_normal, gallery_green+gallery_normal)
+            self.print_dataset_statistics(train, query_green+query_normal, gallery_green+gallery_normal)
 
-        self.train = train + train2
+        self.train = train
         self.query_green = query_green
         self.gallery_green = gallery_green
         self.query_normal = query_normal
         self.gallery_normal = gallery_normal
-
+        self.val_gallery = val_gallery
+        self.val_query = val_query
+        
         self.num_train_pids, self.num_train_imgs, self.num_train_cams = self.get_imagedata_info(self.train)
 
 
     def _process_dir(self, data_dir, relabel=True):
-        #xxxxx= 0
         filename = osp.join(data_dir, 'train_list.txt')
         dataset = []
         camid = 1
@@ -40,6 +40,8 @@ class NAIC(BaseImageDataset):
                 if not lines:
                     break
                 img_name,img_label = [i for i in lines.split(':')]
+                #if img_name == 'train/105180993.png' or img_name=='train/829283568.png' or img_name=='train/943445997.png': # remove samples with wrong label
+                #    continue
                 count_image[img_label].append(img_name)
         val_imgs = {}
         pid_container = set()
@@ -52,15 +54,15 @@ class NAIC(BaseImageDataset):
         pid2label = {pid: label for label, pid in enumerate(pid_container)}
         for pid, img_name in val_imgs.items():
             pid = pid2label[pid]
-            #xxxxx = max(xxxxx,pid)
             for img in img_name:
                 dataset.append((osp.join(data_dir+'/images', img), pid, camid))
-        #print('---------------------',xxxxx)
+
         return dataset
 
-    def _process_dir_old_data(self, data_dir, relabel=True):
+    def _process_dir_val(self, data_dir, relabel=True):
         filename = osp.join(data_dir, 'train_list.txt')
         dataset = []
+        val_query = []
         camid = 1
         count_image=defaultdict(list)
         with open(filename, 'r') as file_to_read:
@@ -69,7 +71,6 @@ class NAIC(BaseImageDataset):
                 if not lines:
                     break
                 img_name,img_label = [i for i in lines.split()]
-                #img_label = str(int(img_label)+ 15507)  #transform label for old data
                 if img_name == 'train/105180993.png' or img_name=='train/829283568.png' or img_name=='train/943445997.png': # remove samples with wrong label
                     continue
                 count_image[img_label].append(img_name)
@@ -82,12 +83,17 @@ class NAIC(BaseImageDataset):
                 val_imgs[pid] = count_image[pid]
                 pid_container.add(pid)
         pid2label = {pid: label for label, pid in enumerate(pid_container)}
+        new_label = []
         for pid, img_name in val_imgs.items():
             pid = pid2label[pid]
             for img in img_name:
-                dataset.append((osp.join(data_dir, img), pid+15505, camid))
+                if pid not in new_label:
+                    new_label.append(pid)
+                    val_query.append((osp.join(data_dir, img), pid, camid))
+                else:
+                    dataset.append((osp.join(data_dir, img), pid, 2))
 
-        return dataset
+        return dataset,val_query
 
 
 
@@ -98,9 +104,10 @@ class NAIC(BaseImageDataset):
             subfix = 'bounding_box_test'
 
         datatype = ['green', 'normal']
+        dataset = []
         for index, type in enumerate(datatype):
             filename = osp.join(data_dir, '{}_{}.txt'.format(subfix, type))
-            dataset = []
+            #dataset = []
             with open(filename, 'r') as file_to_read:
                 while True:
                     lines = file_to_read.readline()
@@ -109,7 +116,7 @@ class NAIC(BaseImageDataset):
                     for i in lines.split():
                         img_name = i
                     xxx = osp.join(self.dataset_dir_test, subfix, img_name)
-                    xxx = xxx.replace('/test/','/image_A/')
+                    xxx = xxx.replace('/test/','/image_B/')
                     dataset.append((xxx, 1, 1))
             if index == 0:
                 dataset_green = dataset

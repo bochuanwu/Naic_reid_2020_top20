@@ -10,6 +10,7 @@ from utils.metrics import R1_mAP, R1_mAP_Pseudo
 import json
 import datetime
 from processor.crop import center_crop, crop_lb, crop_lt, crop_rb, crop_rt
+import torchvision.transforms as T
 try:
     from apex.parallel import DistributedDataParallel as DDP
     from apex.fp16_utils import *
@@ -94,11 +95,16 @@ def do_train(cfg,
             torch.save(model.state_dict(), os.path.join(cfg.OUTPUT_DIR, cfg.MODEL.NAME + '_{}.pth'.format(epoch)))
 
 
+def tensor_to_np(tensor):
+    img = img.cpu().numpy().squeeze(0).transpose((1, 2, 0))
+    return img
+
+
 def do_inference(cfg,
                  model,
-                 val_loader_green,
-                val_loader_normal,
-                 num_query_green,
+                 #val_loader_green,
+                 val_loader_normal,
+                 #num_query_green,
                  num_query_normal):
     device = "cuda"
     logger = logging.getLogger("reid_baseline.test")
@@ -111,24 +117,27 @@ def do_inference(cfg,
         model.to(device)
 
     model.eval()
-    val_loader = [val_loader_green, val_loader_normal]
+    val_loader = [val_loader_normal]
+    #12 3 0.6
+    reranking_parameter = [30, 4, 0.8] 
     for index, loader in enumerate(val_loader):
+        print(index)
         if index == 0:
             subfix = '1'
-            reranking_parameter = [14, 4, 0.4]
-            evaluator = R1_mAP(num_query_green, max_rank=200, feat_norm=cfg.TEST.FEAT_NORM,
+            #reranking_parameter = [14, 4, 0.4]
+            evaluator = R1_mAP(num_query_normal, max_rank=200, feat_norm=cfg.TEST.FEAT_NORM,
                                reranking=cfg.TEST.RE_RANKING)
         else:
             subfix = '2'
-            reranking_parameter = [10, 3, 0.6]#[30,4,0.8]
-            evaluator = R1_mAP(num_query_normal, max_rank=200, feat_norm=cfg.TEST.FEAT_NORM,
-                               reranking=cfg.TEST.RE_RANKING)
-
+            #reranking_parameter = [10, 3, 0.6]
+            #evaluator = R1_mAP(num_query_normal, max_rank=200, feat_norm=cfg.TEST.FEAT_NORM,
+            #                   reranking=cfg.TEST.RE_RANKING)
+   
         evaluator.reset()
         DISTMAT_PATH = os.path.join(cfg.OUTPUT_DIR, "distmat_{}.npy".format(subfix))
         QUERY_PATH = os.path.join(cfg.OUTPUT_DIR, "query_path_{}.npy".format(subfix))
         GALLERY_PATH = os.path.join(cfg.OUTPUT_DIR, "gallery_path_{}.npy".format(subfix))
-
+       
         for n_iter, (img, pid, camid, imgpath) in enumerate(loader):
             with torch.no_grad():
                 img = img.to(device)
@@ -138,25 +147,113 @@ def do_inference(cfg,
                         if i == 1:
                             inv_idx = torch.arange(img.size(3) - 1, -1, -1).long().cuda()
                             img = img.index_select(3, inv_idx)
+                        #if i == 2:
+                        #    transfer2 = T.Compose([T.Resize([266,138]),
+                        #        crop_lt(256, 128),
+                        #        T.ToTensor()])
+                        #    img = transfer2(img)
                         f = model(img)
                         feat = feat + f
                 else:
-                    feat = model(img)
+                    print('``````')
+                    feat = torch.FloatTensor(img.size(0), 2048).zero_().cuda()
+                  
+                    f = model(img)
+                    feat = feat + f
 
                 evaluator.update((feat, imgpath))
 
-        data, distmat, img_name_q, img_name_g = evaluator.compute(reranking_parameter)
-        np.save(DISTMAT_PATH, distmat)
-        np.save(QUERY_PATH, img_name_q)
-        np.save(GALLERY_PATH, img_name_g)
+    data, distmat, img_name_q, img_name_g = evaluator.compute(reranking_parameter)
+    np.save(DISTMAT_PATH, distmat)
+    np.save(QUERY_PATH, img_name_q)
+    np.save(GALLERY_PATH, img_name_g)
 
-        if index == 0:
-            data_1 = data
-
-    data_all = {**data_1, **data}
+    #    if index == 0:
+    #        data_1 = data
+    data_all = {**data}
+    #data_all = {**data_1, **data}
     nowTime = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
     with open(os.path.join(cfg.OUTPUT_DIR, 'result_{}.json'.format(nowTime)), 'w',encoding='utf-8') as fp:
         json.dump(data_all, fp)
+
+
+def do_inference_multi(cfg,
+                 model,
+                 #val_loader_green,
+                 val_loader_normal,
+                 #num_query_green,
+                 num_query_normal):
+    device = "cuda"
+    logger = logging.getLogger("reid_baseline.test")
+    logger.info("Enter inferencing")
+
+    if device:
+        if torch.cuda.device_count() > 1:
+            print('Using {} GPUs for inference'.format(torch.cuda.device_count()))
+            model = nn.DataParallel(model)
+        model.to(device)
+
+    model.eval()
+    fullloader, Centerloader,Ltloader, Rtloader, Lbloader, Rbloader = val_loader_normal
+    #12 3 0.6
+    reranking_parameter = [30, 4, 0.8]
+    
+    for index,(loader0,loader1,loader2,loader3,loader4,loader5) in enumerate(zip([fullloader],[Centerloader],[Ltloader], [Rtloader], [Lbloader], [Rbloader])): 
+        if index == 0:
+            subfix = '1'
+            #reranking_parameter = [14, 4, 0.4]
+            evaluator = R1_mAP(num_query_normal, max_rank=200, feat_norm=cfg.TEST.FEAT_NORM,
+                               reranking=cfg.TEST.RE_RANKING)
+            #reranking_parameter = [10, 3, 0.6]
+            #evaluator = R1_mAP(num_query_normal, max_rank=200, feat_norm=cfg.TEST.FEAT_NORM,
+            #                   reranking=cfg.TEST.RE_RANKING)
+
+        evaluator.reset()
+        DISTMAT_PATH = os.path.join(cfg.OUTPUT_DIR, "distmat_{}.npy".format(subfix))
+        QUERY_PATH = os.path.join(cfg.OUTPUT_DIR, "query_path_{}.npy".format(subfix))
+        GALLERY_PATH = os.path.join(cfg.OUTPUT_DIR, "gallery_path_{}.npy".format(subfix))
+
+        for n_iter, (img,img1,img2,img3,img4,img5) in enumerate(zip(loader0,loader1,loader2,loader3,loader4,loader5)):
+            with torch.no_grad():
+                #img = img[0].to(device)
+                img1 = img1[0].to(device)
+                img2 = img2[0].to(device)
+                img3 = img3[0].to(device)
+                img4 = img4[0].to(device)
+                img5 = img5[0].to(device)
+                imgpath = img[3]
+                img = img[0].to(device)
+                if cfg.TEST.FLIP_FEATS != 'on':
+                    feat = torch.FloatTensor(img.size(0), 2048).zero_().cuda()
+                    for i in range(2):
+                        if i == 1:
+                            inv_idx = torch.arange(img.size(3) - 1, -1, -1).long().cuda()
+                            img = img.index_select(3, inv_idx)
+                        f = model(img)
+                        feat = feat + f
+                f = model(img1)
+                feat = feat + f
+                f = model(img2)
+                feat = feat + f
+                f = model(img3)
+                feat = feat + f
+                f = model(img4)
+                feat = feat + f
+                f = model(img5)
+                feat = feat + f
+
+                evaluator.update((feat, imgpath))
+    data, distmat, img_name_q, img_name_g = evaluator.compute(reranking_parameter)
+    np.save(DISTMAT_PATH, distmat)
+    np.save(QUERY_PATH, img_name_q)
+    np.save(GALLERY_PATH, img_name_g)
+
+    data_all = {**data}
+    #data_all = {**data_1, **data}
+    nowTime = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+    with open(os.path.join(cfg.OUTPUT_DIR, 'result_{}.json'.format(nowTime)), 'w',encoding='utf-8') as fp:
+        json.dump(data_all, fp)
+
 
 
 def do_inference_Pseudo(cfg,

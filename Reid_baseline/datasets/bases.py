@@ -1,5 +1,5 @@
 from PIL import Image, ImageFile
-import numpy as np
+
 from torch.utils.data import Dataset
 import os.path as osp
 
@@ -15,12 +15,7 @@ def read_image(img_path):
     while not got_img:
         try:
             img = Image.open(img_path).convert('RGB')
-                      
-            img = np.array(img)
-            gbr = [img[...,[0,1,2]],img[...,[0,2,1]],img[...,[1,0,2]],img[...,[1,2,0]],img[...,[2,1,0]],img[...,[2,0,1]]]
-            idx = np.random.choice(np.arange(6), size=1, replace=False)
-            img = Image.fromarray(gbr[idx[0]])
-            
+            #img = Image.open(img_path).convert('L')
             got_img = True
         except IOError:
             print("IOError incurred when reading '{}'. Will redo. Don't worry. Just chill.".format(img_path))

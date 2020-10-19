@@ -5,13 +5,13 @@ MODEL:
   IF_LABELSMOOTH: 'on'
   IF_WITH_CENTER: 'yes'
   NAME: 'resnet101_ibn_a'
-  DEVICE_ID: ('0,1')
+  DEVICE_ID: ('1')
   ID_LOSS_TYPE: 'arcface'
   ID_LOSS_WEIGHT: 0.1
   TRIPLET_LOSS_WEIGHT: 0.9
   WEIGHTED_TRIPLET: True
   NO_MARGIN: True
-  USE_SESTN: True
+
 INPUT:
   SIZE_TRAIN: [256, 128]
   SIZE_TEST: [256, 128]
@@ -30,19 +30,19 @@ DATALOADER:
   NUM_WORKERS: 8
 
 SOLVER:
-  OPTIMIZER_NAME: 'Ranger'
+  OPTIMIZER_NAME: 'Adam'
   MAX_EPOCHS: 120
-  BASE_LR: 0.006
-  IMS_PER_BATCH: 224
-  STEPS: [40,70] #25,40
+  BASE_LR: 3e-4
+  IMS_PER_BATCH: 128
+  STEPS: [40, 70] #25,40
   GAMMA: 0.1
   WARMUP_FACTOR: 0.01
   WARMUP_EPOCHS: 10
   WARMUP_METHOD: 'linear'
   LARGE_FC_LR: True
-  CHECKPOINT_PERIOD: 5
+  CHECKPOINT_PERIOD: 10
   LOG_PERIOD: 50
-  EVAL_PERIOD: 2000
+  EVAL_PERIOD: 10000
   COSINE_MARGIN: 0.4
   COSINE_SCALE: 30
   CENTER_LOSS_WEIGHT: 0.0003
@@ -51,10 +51,10 @@ SOLVER:
 TEST:
   IMS_PER_BATCH: 128
   RE_RANKING: True
-  WEIGHT:  '../model/1229-a-noCJ-pk4-LFL-readimg-bs224/resnet101_ibn_a_120.pth'
+  WEIGHT: '../model/1229-a-noCJ-pk4-LFL-readimg-bs224/resnet101_ibn_a_120.pth'
   NECK_FEAT: 'after'
   FEAT_NORM: 'yes'
-  FLIP_FEATS: 'on'
-OUTPUT_DIR: "../model/1229-a-noCJ-pk4-LFL-readimg-bs224/" 
+  FLIP_FEATS: 'off'
+OUTPUT_DIR: "../model/1229-a-noCJ-pk4-LFL-readimg-bs224/"
 
 
