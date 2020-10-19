@@ -3,7 +3,7 @@ from config import cfg
 import argparse
 from datasets import make_dataloader
 from model import make_model
-from processor import do_inference
+from processor import do_inference,do_inference_multi
 from utils.logger import setup_logger
 
 
@@ -39,13 +39,24 @@ if __name__ == "__main__":
 
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg.MODEL.DEVICE_ID
 
-    train_loader, val_loader_green, val_loader_normal, num_query_green,num_query_normal, num_classes = make_dataloader(cfg)
-    model = make_model(cfg, num_class=num_classes)
-    model.load_param(cfg.TEST.WEIGHT)
 
-    do_inference(cfg,
+    if cfg.TEST.FLIP_FEATS != 'on': 
+        train_loader, val_loader, num_query_normal, num_classes,val_loader_center,val_loader_lb,val_loader_rb,val_loader_rt,val_loader_lt = make_dataloader(cfg)
+        val_loader_normal = [val_loader,val_loader_center,val_loader_lt,val_loader_rt,val_loader_lb,val_loader_rb] 
+        model = make_model(cfg, num_class=num_classes)
+        model.load_param(cfg.TEST.WEIGHT)
+
+        do_inference_multi(cfg,
                  model,
-                 val_loader_green,
                  val_loader_normal,
-                 num_query_green,
+                 num_query_normal)
+
+    else:
+        train_loader, val_loader_normal, num_query_normal, num_classes = make_dataloader(cfg)
+        model = make_model(cfg, num_class=num_classes)
+        model.load_param(cfg.TEST.WEIGHT)
+
+        do_inference(cfg,
+                 model,
+                 val_loader_normal,
                  num_query_normal)
