@@ -31,7 +31,7 @@
    - [yacs](https://github.com/rbgirshick/yacs)
    - cv2
    
-   We use cuda 10.1/python 3.6.10/torch 1.5.0/torchvision 0.6.0 for training and testing.
+   I use cuda 10.1/python 3.6.10/torch 1.5.0/torchvision 0.6.0 for training and testing.
    
 5.  [ResNet-ibn](https://github.com/XingangPan/IBN-Net) is applied as the backbone. Download ImageNet pretrained model  [here](https://drive.google.com/drive/folders/1thS2B8UOSBi_cJX6zRy6YYRwz_nVFI_S)  or using the link in the source code 'pth.txt'
 
