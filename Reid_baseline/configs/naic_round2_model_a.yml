@@ -54,7 +54,7 @@ TEST:
   WEIGHT: '../model/1229-a-noCJ-pk4-LFL-readimg-bs224/resnet101_ibn_a_120.pth'
   NECK_FEAT: 'after'
   FEAT_NORM: 'yes'
-  FLIP_FEATS: 'off'
+  FLIP_FEATS: 'on'
 OUTPUT_DIR: "../model/1229-a-noCJ-pk4-LFL-readimg-bs224/"
 
 
