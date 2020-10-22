@@ -1,4 +1,5 @@
 from efficientnet_pytorch import EfficientNet
+from .backbones.cls_hrnet import get_cls_net
 import torch
 import torch.nn as nn
 from .backbones.resnet import ResNet, BasicBlock, Bottleneck
@@ -99,11 +100,15 @@ class Backbone(nn.Module):
             self.in_planes = 2048
             self.base = resnext101_ibn_a(last_stride)
             print('using resnext101_ibn_a as a backbone')
-
+            
+        elif model_name == 'HRnet':
+            self.in_planes = 2048
+            self.base = get_cls_net(cfg, pretrained = model_path)  
+            
         else:
             print('unsupported backbone! but got {}'.format(model_name))
 
-        if pretrain_choice == 'imagenet' and model_name != 'efficientnet_b4' and model_name != 'efficientnet_b7':
+        if pretrain_choice == 'imagenet' and model_name != 'efficientnet_b4' and model_name != 'efficientnet_b7' and  model_name != 'HRnet':
        
             self.base.load_param(model_path)
             print('Loading pretrained ImageNet model......from {}'.format(model_path))
@@ -139,51 +144,93 @@ class Backbone(nn.Module):
         self.bottleneck = nn.BatchNorm1d(self.in_planes)
         self.bottleneck.bias.requires_grad_(False)
         self.bottleneck.apply(weights_init_kaiming)
-
+        if self.model_name == 'HRnet':
+            self.attention_tconv = nn.Conv1d(self.in_planes, 1, 3, padding=1)                        
+            self.upsample0 = nn.Sequential(
+                                    nn.Conv2d(32, self.in_planes, kernel_size=1, stride=1, bias=False),
+                                        )
+            self.upsample1 = nn.Sequential(
+                                    nn.Conv2d(64, self.in_planes, kernel_size=1, stride=1, bias=False),
+                                        )
+            self.upsample2 = nn.Sequential(
+                                    nn.Conv2d(128, self.in_planes, kernel_size=1, stride=1, bias=False),
+                                        )
+            self.upsample3 = nn.Sequential(
+                                    nn.Conv2d(256, self.in_planes, kernel_size=1, stride=1, bias=False),
+                                        )
+            
     def forward(self, x, label=None):  # label is unused if self.cos_layer == 'no'
-        if self.model_name =='efficientnet_b4' or self.model_name =='efficientnet_b7':
-            x = self.base.extract_features(x)
-        else: 
-            x = self.base(x)
-       
-        global_feat = self.gap(x)
-        global_feat = global_feat.view(global_feat.shape[0], -1)  # flatten to (bs, 2048)
-        feat = self.bottleneck(global_feat)
+        if self.model_name == 'HRnet':
+            y_list = self.base(x)
+            
+            global_feat0 = self.gap(self.upsample0(y_list[0])) 
+            global_feat1 = self.gap(self.upsample1(y_list[1])) 
+            global_feat2 = self.gap(self.upsample2(y_list[2])) 
+            global_feat3 = self.gap(self.upsample3(y_list[3])) 
+            weight_ori = torch.cat([global_feat0, global_feat1, global_feat2, global_feat3], dim=2)
+            weight_ori = weight_ori.view(weight_ori.shape[0], weight_ori.shape[1], -1)
+            attention_feat = F.relu(self.attention_tconv(weight_ori))
+            attention_feat = torch.squeeze(attention_feat)
+            weight = F.sigmoid(attention_feat)
+            weight = F.normalize(weight, p=1, dim=1)
 
-        if self.neck == 'no':
-            feat = global_feat
-        elif self.neck == 'bnneck':
+            weight = torch.unsqueeze(weight, 1)
+            weight = weight.expand_as(weight_ori)
+            global_feat = torch.mul(weight_ori, weight)
+            global_feat = global_feat.sum(-1)
+            global_feat = global_feat.view(global_feat.shape[0], -1) #flatten to (bs, 2048)
             feat = self.bottleneck(global_feat)
-
-        if self.training:
-            if self.ID_LOSS_TYPE in ('arcface', 'cosface', 'amsoftmax', 'circle'):
-                cls_score = self.classifier(feat, label)
+            if self.training:
+                if self.ID_LOSS_TYPE in ('arcface', 'cosface', 'amsoftmax', 'circle'):
+                    cls_score = self.classifier(feat, label)
+                else:
+                    cls_score = self.classifier(feat)
+                return cls_score, global_feat  # global feature for triplet loss
             else:
-                cls_score = self.classifier(feat)
-
-            return cls_score, global_feat
-        else:
-            if self.neck_feat == 'after':
-                # print("Test with feature after BN")
                 return feat
+        else:
+            if self.model_name =='efficientnet_b4' or self.model_name =='efficientnet_b7':
+                x = self.base.extract_features(x)
             else:
-                # print("Test with feature before BN")
-                return global_feat
+                x = self.base(x)
+            global_feat = self.gap(x)
+            global_feat = global_feat.view(global_feat.shape[0], -1)  # flatten to (bs, 2048)
+
+            if self.neck == 'no':
+                feat = global_feat
+            elif self.neck == 'bnneck':
+                feat = self.bottleneck(global_feat)
+
+            if self.training:
+                if self.ID_LOSS_TYPE in ('arcface', 'cosface', 'amsoftmax', 'circle'):
+                    #print(feat,label)
+                    cls_score = self.classifier(feat, label)
+                else:
+                    cls_score = self.classifier(feat)
+
+                return cls_score, global_feat
+            else:
+                if self.neck_feat == 'after':
+                    # print("Test with feature after BN")
+                    return feat
+                else:
+                    # print("Test with feature before BN")
+                    return global_feat
 
     def load_param(self, trained_path):
         param_dict = torch.load(trained_path)
-        #'''
+        '''
         from collections import OrderedDict
         new_state_dict = OrderedDict()
         for k, v in param_dict.items():
             name = k[7:] # remove `module.`，表面从第7个key值字符取到最后一个字符，正好去掉了module.
             new_state_dict[name] = v #新字典的key值对应的value为一一对应的值。
-        #'''
-        for i in new_state_dict: #param_dict:
+        '''
+        for i in param_dict:
             if 'classifier' in i or 'arcface' in i:
                 continue
-            #self.state_dict()[i].copy_(param_dict[i])
-            self.state_dict()[i].copy_(new_state_dict[i])
+            self.state_dict()[i].copy_(param_dict[i])
+            #self.state_dict()[i].copy_(new_state_dict[i])
         print('Loading pretrained model from {}'.format(trained_path))
 
     def load_param_finetune(self, model_path):
